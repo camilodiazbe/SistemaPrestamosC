@@ -6,6 +6,8 @@ from io import BytesIO
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import os
+import psycopg2
+
 
 
 app = Flask(__name__)
@@ -26,7 +28,8 @@ def login_required(f):
 # INICIALIZAR BASE DE DATOS
 # =========================
 def init_db():
-    conn = sqlite3.connect('prestamos.db')
+    DATABASE_URL = os.environ.get("postgresql://cmcash_user:OQFijCuQmKTdK21Y4GkNRojDzcVdt775@dpg-d6cs3jstgctc73ep6ju0-a/cmcash")
+    conn = psycopg2.connect(DATABASE_URL)
     c = conn.cursor()
 
     c.execute('''
