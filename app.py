@@ -147,7 +147,6 @@ def calcular_mora(base, fecha_vencimiento, pagado):
 
     return 0, 0
 
-
 # =========================
 # INDEX
 # =========================
@@ -213,7 +212,7 @@ def index():
     return render_template('index.html', prestamos=prestamos_procesados)
 
 # =========================
-# 📊 CONTROL REAL DE GANANCIAS (CORREGIDO PROFESIONAL)
+# 📊 CONTROL REAL DE GANANCIAS
 # =========================
 @app.route('/estadisticas')
 @login_required
@@ -221,109 +220,28 @@ def estadisticas():
     conn = get_connection()
     c = conn.cursor()
 
-    # Total capital prestado histórico
     c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos")
     total_prestado = float(c.fetchone()[0])
 
-    # Total dinero ingresado por abonos
     c.execute("SELECT COALESCE(SUM(monto),0) FROM abonos")
     total_abonos = float(c.fetchone()[0])
 
-    # Capital en la calle (préstamos no pagados)
-    c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos WHERE pagado = FALSE")
-    capital_en_calle = float(c.fetchone()[0])
-
-      # =========================
-@app.route("/agregar", methods=["POST"])
-@login_required
-def agregar():
-    nombre = request.form.get("nombre")
-    cedula = request.form.get("cedula")
-    celular = request.form.get("celular")
-    monto = request.form.get("monto")
-    interes = request.form.get("interes")
-    fecha_prestamo = request.form.get("fecha_prestamo")
-    fecha_pago = request.form.get("fecha_pago")
-    medio = request.form.get("medio")
-    objeto = request.form.get("objeto")
-    tipo_prestamo = request.form.get("tipo_prestamo")
-    plazo_dias = request.form.get("plazo_dias") or 30
-
-    try:
-        monto = float(monto)
-        interes = float(interes)
-        plazo_dias = int(plazo_dias)
-        fecha_prestamo_dt = datetime.strptime(fecha_prestamo, "%Y-%m-%d").date()
-        fecha_pago_dt = datetime.strptime(fecha_pago, "%Y-%m-%d").date()
-        if monto <= 0 or interes < 0:
-            raise ValueError("Monto e interés inválidos")
-        if fecha_pago_dt < fecha_prestamo_dt:
-            raise ValueError("Fecha de pago no puede ser anterior a la de préstamo")
-    except Exception as e:
-        return f"Error en los datos ingresados: {e}", 400
-
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("""
-        INSERT INTO prestamos (
-            nombre, cedula, celular, monto, interes, fecha_prestamo, fecha_pago, medio, objeto, tipo_prestamo, plazo_dias
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-    """, (
-        nombre, cedula, celular, monto, interes, fecha_prestamo_dt, fecha_pago_dt, medio, objeto, tipo_prestamo, plazo_dias
-    ))
-    conn.commit()
-    conn.close()
-
-    return redirect("/")
-        # =========================
-
-    # =========================
-    # GANANCIA REAL CORRECTA
-    # =========================
-
-    # Traemos préstamos y cuánto han abonado
-    c.execute("""
-        SELECT p.id, p.monto,
-               COALESCE(SUM(a.monto),0) as total_abonado
-        FROM prestamos p
-        LEFT JOIN abonos a ON p.id = a.prestamo_id
-        GROUP BY p.id
-    """)
-    datos = c.fetchall()
-
-    ganancia_real = 0
-
-    for prestamo_id, capital, abonado in datos:
-        capital = float(capital)
-        abonado = float(abonado)
-
-        if abonado > capital:
-            ganancia_real += (abonado - capital)
-
-    # =========================
-    # GANANCIA PROYECTADA
-    # =========================
-
-    c.execute("SELECT monto, interes FROM prestamos WHERE pagado = FALSE")
-    prestamos_activos = c.fetchall()
-
-    ganancia_proyectada = 0
-    for capital, interes in prestamos_activos:
-        capital = float(capital)
-        interes = float(interes)
-        ganancia_proyectada += capital * (interes / 100)
-
-    # Total interés histórico generado
     c.execute("SELECT monto, interes FROM prestamos")
     prestamos = c.fetchall()
 
     total_interes_generado = 0
-    for capital, interes in prestamos:
-        capital = float(capital)
-        interes = float(interes)
+    for p in prestamos:
+        capital = float(p[0])
+        interes = float(p[1])
         total_interes_generado += capital * (interes / 100)
 
+    c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos WHERE pagado = FALSE")
+    capital_en_calle = float(c.fetchone()[0])
+
     conn.close()
+
+    ganancia_real = total_abonos - total_prestado
+    ganancia_proyectada = total_interes_generado
 
     return render_template("estadisticas.html",
         total_prestado=round(total_prestado,2),
@@ -333,6 +251,7 @@ def agregar():
         ganancia_real=round(ganancia_real,2),
         ganancia_proyectada=round(ganancia_proyectada,2)
     )
+
 # =========================
 # RUN
 # =========================
