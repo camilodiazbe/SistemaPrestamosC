@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+    
+<head>
+<title>Sistema de Préstamos</title>
+<style>
+body{font-family:Arial;background:#f4f4f4;padding:40px}
+.card{background:white;padding:20px;border-radius:12px;margin-bottom:20px}
+input, select{padding:8px;margin:5px}
+button{padding:10px 15px;background:black;color:white;border:none;border-radius:8px;cursor:pointer}
+table{width:100%;background:white;border-radius:12px;margin-top:20px;border-collapse:collapse;font-size:13px}
+th,td{padding:8px;text-align:center;border-bottom:1px solid #ddd}
+.activo{color:green;font-weight:bold}
+.vencido{color:red;font-weight:bold}
+.pagado{color:blue;font-weight:bold}
+</style>
+
+<script>
+function calcularPreview(){
+    let monto = parseFloat(document.getElementById("monto").value) || 0;
+    let interes = parseFloat(document.getElementById("interes").value) || 0;
+    let total = monto + (monto * interes / 100);
+    document.getElementById("preview").innerText = 
+        "Total sin mora: $" + total.toFixed(2);
+}
+</script>
+</head>
+<body>
+
+<h2>💰 Sistema de Préstamos Camilo Marrugo 💵</h2>
+
+<div class="card">
+<h3>📊 Reportes Financieros</h3>
+
+<a href="/exportar_historico">
+<button>Descargar Reporte Histórico</button>
+</a>
+
+<br><br>
+
+<form method="POST" action="/exportar_fechas">
+<input type="date" name="fecha_inicio" required>
+<input type="date" name="fecha_fin" required>
+<button type="submit">Descargar Reporte por Fechas</button>
+</form>
+</div>
+
+<div class="card">
+<h3>Registrar Préstamo</h3>
+<form method="POST" action="/agregar">
+<input name="nombre" placeholder="Nombre completo" required>
+<input name="cedula" placeholder="Número de cédula" required>
+<input name="celular" placeholder="Celular" required>
+
+<input id="monto" name="monto" type="number" placeholder="Monto" onkeyup="calcularPreview()" required>
+<input id="interes" name="interes" type="number" placeholder="% Interés" onkeyup="calcularPreview()" required>
+
+<input name="fecha_prestamo" type="date" required>
+<input name="fecha_pago" type="date" required>
+
+<input name="medio" placeholder="Nequi / Efectivo" required>
+<input name="objeto" placeholder="Objeto en garantía" required>
+
+<select name="tipo_prestamo" required>
+    <option value="fijo">Préstamo con plazo</option>
+    <option value="indefinido">Préstamo indefinido</option>
+</select>
+
+<input name="plazo_dias" type="number" placeholder="Plazo en días (si es fijo)">
+
+<p id="preview"></p>
+<button type="submit">Registrar</button>
+</form>
+</div>
+
+<table>
+<tr>
+<th>Cliente</th>
+<th>Cédula</th>
+<th>Celular</th>
+<th>Tipo</th>
+<th>Monto</th>
+<th>Porcentaje %</th>
+<th>Medio</th>
+<th>Garantía</th>
+<th>Fecha Préstamo</th>
+<th>Fecha Pago</th>
+<th>Mora</th>
+<th>Días vencidos</th>
+<th>Vence en</th>
+<th>Total Deuda</th>
+<th>Estado</th>
+<th>Acciones</th>
+</tr>
+
+{% for p in prestamos %}
+<tr>
+<td>{{p.nombre}}</td>
+<td>{{p.cedula}}</td>
+<td>{{p.celular}}</td>
+<td>{{p.tipo_prestamo}}</td>
+<td>${{p.monto}}</td>
+<td>{{p.interes}}%</td>
+<td>{{p.medio}}</td>
+<td>{{p.objeto}}</td>
+<td>{{p.fecha_prestamo}}</td>
+<td>{{p.fecha_pago}}</td>
+<td>${{p.mora}}</td>
+<td>{{p.dias}}</td>
+
+<td>
+{% if p.dias_restantes == "∞" %}
+∞
+{% elif p.pagado == 1 %}
+—
+{% elif p.dias_restantes > 0 %}
+{{p.dias_restantes}} días
+{% else %}
+0 días
+{% endif %}
+</td>
+
+<td><strong>${{p.total}}</strong></td>
+
+<td>
+{% if p.pagado == 1 %}
+<span class="pagado">Pagado</span>
+{% elif p.dias > 0 %}
+<span class="vencido">Vencido</span>
+{% else %}
+<span class="activo">Activo</span>
+{% endif %}
+</td>
+
+<td>
+
+{% if p.pagado == 0 %}
+
+<form method="POST" action="/abonar/{{p.id}}">
+<input name="abono" type="number" placeholder="Abono" required>
+<button type="submit">Abonar</button>
+</form>
+
+<br>
+
+<a href="/pagar/{{p.id}}">
+<button>Pagar Total</button>
+</a>
+
+{% endif %}
+
+<br>
+
+<a href="/eliminar/{{p.id}}">
+<button style="background:red;margin-top:5px;">Eliminar</button>
+</a>
+
+</td>
+
+</tr>
+{% endfor %}
+
+</table>
+
+</body>
+</html>
+

@@ -1,0 +1,270 @@
+from flask import Flask, render_template, request, redirect, send_file
+from datetime import datetime, timedelta
+import sqlite3
+import openpyxl
+from io import BytesIO
+
+app = Flask(__name__)
+
+# =========================
+# INICIALIZAR BASE DE DATOS
+# =========================
+def init_db():
+    conn = sqlite3.connect('prestamos.db')
+    c = conn.cursor()
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS prestamos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT,
+            cedula TEXT,
+            celular TEXT,
+            monto REAL,
+            interes REAL,
+            fecha_prestamo TEXT,
+            fecha_pago TEXT,
+            medio TEXT,
+            objeto TEXT,
+            pagado INTEGER DEFAULT 0,
+            tipo_prestamo TEXT DEFAULT 'fijo',
+            plazo_dias INTEGER DEFAULT 30
+        )
+    ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS abonos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            prestamo_id INTEGER,
+            fecha TEXT,
+            monto REAL
+        )
+    ''')
+
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS configuracion (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mora_diaria REAL
+        )
+    ''')
+
+    c.execute("SELECT COUNT(*) FROM configuracion")
+    if c.fetchone()[0] == 0:
+        c.execute("INSERT INTO configuracion (mora_diaria) VALUES (0.5)")
+
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# =========================
+# CALCULAR MORA
+# =========================
+def calcular_mora(base, fecha_vencimiento, pagado):
+    if pagado == 1:
+        return 0, 0
+
+    conn = sqlite3.connect('prestamos.db')
+    c = conn.cursor()
+    c.execute("SELECT mora_diaria FROM configuracion LIMIT 1")
+    mora_porcentaje = c.fetchone()[0]
+    conn.close()
+
+    hoy = datetime.now().date()
+    if hoy > fecha_vencimiento:
+        dias_vencidos = (hoy - fecha_vencimiento).days
+        mora = base * (mora_porcentaje / 100) * dias_vencidos
+        return round(mora, 2), dias_vencidos
+
+    return 0, 0
+
+# =========================
+# PÁGINA PRINCIPAL
+# =========================
+@app.route('/')
+def index():
+    conn = sqlite3.connect('prestamos.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+
+    c.execute("SELECT * FROM prestamos")
+    prestamos = c.fetchall()
+    prestamos_procesados = []
+
+    for p in prestamos:
+        c.execute("SELECT SUM(monto) FROM abonos WHERE prestamo_id = ?", (p["id"],))
+        total_abonos = c.fetchone()[0] or 0
+
+        fecha_prestamo = datetime.strptime(p["fecha_prestamo"], "%Y-%m-%d").date()
+        hoy = datetime.now().date()
+        dias_transcurridos = (hoy - fecha_prestamo).days
+
+        capital = p["monto"]
+
+        if p["tipo_prestamo"] == "fijo":
+            fecha_vencimiento = fecha_prestamo + timedelta(days=p["plazo_dias"])
+            interes = capital * (p["interes"] / 100)
+            base = capital + interes
+            mora, dias = calcular_mora(base, fecha_vencimiento, p["pagado"])
+            total_deuda = base + mora
+            deuda_restante = total_deuda - total_abonos
+            if deuda_restante < 0:
+                deuda_restante = 0
+            dias_restantes = (fecha_vencimiento - hoy).days
+        else:
+            ciclos = dias_transcurridos // 30
+            interes = capital * (p["interes"] / 100) * (ciclos + 1)
+            total_deuda = capital + interes
+            mora = 0
+            dias = 0
+            dias_restantes = "∞"
+            deuda_restante = total_deuda - total_abonos
+            if deuda_restante < 0:
+                deuda_restante = 0
+
+        prestamos_procesados.append({
+            "id": p["id"],
+            "nombre": p["nombre"],
+            "cedula": p["cedula"],
+            "celular": p["celular"],
+            "monto": p["monto"],
+            "interes": p["interes"],
+            "fecha_prestamo": p["fecha_prestamo"],
+            "fecha_pago": p["fecha_pago"],
+            "medio": p["medio"],
+            "objeto": p["objeto"],
+            "pagado": p["pagado"],
+            "tipo_prestamo": p["tipo_prestamo"],
+            "mora": mora,
+            "dias": dias,
+            "dias_restantes": dias_restantes,
+            "total": round(deuda_restante, 2)
+        })
+
+    conn.close()
+    return render_template('index.html', prestamos=prestamos_procesados)
+
+# =========================
+# AGREGAR PRÉSTAMO
+# =========================
+@app.route('/agregar', methods=['POST'])
+def agregar():
+    conn = sqlite3.connect('prestamos.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO prestamos
+        (nombre, cedula, celular, monto, interes, fecha_prestamo, fecha_pago, medio, objeto, tipo_prestamo, plazo_dias)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        request.form['nombre'],
+        request.form['cedula'],
+        request.form['celular'],
+        float(request.form['monto']),
+        float(request.form['interes']),
+        request.form['fecha_prestamo'],
+        request.form['fecha_pago'],
+        request.form['medio'],
+        request.form['objeto'],
+        request.form['tipo_prestamo'],
+        int(request.form['plazo_dias'] or 30)
+    ))
+    conn.commit()
+    conn.close()
+    return redirect('/')
+
+# =========================
+# REGISTRAR ABONO
+# =========================
+@app.route('/abonar/<int:id>', methods=['POST'])
+def abonar(id):
+    monto_abono = float(request.form['abono'])
+    conn = sqlite3.connect('prestamos.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO abonos (prestamo_id, fecha, monto) VALUES (?, ?, ?)",
+              (id, datetime.now().strftime("%Y-%m-%d"), monto_abono))
+    conn.commit()
+    conn.close()
+    return redirect('/')
+
+# =========================
+# MARCAR COMO PAGADO
+# =========================
+@app.route('/pagar/<int:id>')
+def pagar(id):
+    conn = sqlite3.connect('prestamos.db')
+    c = conn.cursor()
+    c.execute("UPDATE prestamos SET pagado = 1 WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return redirect('/')
+
+# =========================
+# ELIMINAR
+# =========================
+@app.route('/eliminar/<int:id>')
+def eliminar(id):
+    conn = sqlite3.connect('prestamos.db')
+    c = conn.cursor()
+    c.execute("DELETE FROM prestamos WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return redirect('/')
+
+# =========================
+# EXPORTAR GANANCIAS A EXCEL
+# =========================
+@app.route('/exportar')
+def exportar():
+    conn = sqlite3.connect('prestamos.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM prestamos")
+    prestamos = c.fetchall()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Ganancias"
+
+    headers = ["Cliente","Capital","Interés","Mora","Total Recuperado","Pendiente","Ganancia Real"]
+    ws.append(headers)
+
+    for p in prestamos:
+        c.execute("SELECT SUM(monto) FROM abonos WHERE prestamo_id = ?", (p["id"],))
+        total_abonos = c.fetchone()[0] or 0
+
+        capital = p["monto"]
+        interes = capital * (p["interes"]/100)
+        fecha_prestamo = datetime.strptime(p["fecha_prestamo"], "%Y-%m-%d").date()
+        fecha_vencimiento = fecha_prestamo + timedelta(days=p["plazo_dias"])
+        mora, _ = calcular_mora(capital+interes, fecha_vencimiento, p["pagado"])
+
+        total_deuda = capital + interes + mora
+        deuda_restante = total_deuda - total_abonos
+        if deuda_restante < 0:
+            deuda_restante = 0
+
+        total_recuperado = total_abonos
+        pendiente = deuda_restante
+        ganancia_real = interes + mora
+
+        ws.append([
+            p["nombre"],
+            capital,
+            round(interes,2),
+            round(mora,2),
+            round(total_recuperado,2),
+            round(pendiente,2),
+            round(ganancia_real,2)
+        ])
+
+    conn.close()
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(output,
+                     attachment_filename="ganancias.xlsx",
+                     as_attachment=True,
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=10000)
