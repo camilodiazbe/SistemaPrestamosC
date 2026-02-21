@@ -8,7 +8,7 @@ import os
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave_super_segura_cambiar_en_produccion")
 
-DATABASE_URL = os.environ.get("postgresql://cmcash_user:OQFijCuQmKTdK21Y4GkNRojDzcVdt775@dpg-d6cs3jstgctc73ep6ju0-a/cmcash")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # =========================
 # CONEXIÓN
