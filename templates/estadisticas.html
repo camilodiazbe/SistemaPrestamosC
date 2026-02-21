@@ -5,6 +5,7 @@
     <title>Dashboard Financiero - CM CASH</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <!-- Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -57,14 +58,17 @@
 
         .ganancia {
             background: linear-gradient(135deg, #16a34a, #22c55e);
+            color: white;
         }
 
         .proyectada {
             background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: white;
         }
 
         .alerta {
             background: linear-gradient(135deg, #b91c1c, #ef4444);
+            color: white;
         }
 
         .volver {
@@ -94,44 +98,32 @@
 
         <div class="card">
             <h3>Total Capital Prestado</h3>
-            <div class="value">
-                $ {{ "{:,.2f}".format(total_prestado or 0) }}
-            </div>
+            <div class="value">$ {{ total_prestado }}</div>
         </div>
 
         <div class="card">
             <h3>Total Dinero Recuperado</h3>
-            <div class="value">
-                $ {{ "{:,.2f}".format(total_abonos or 0) }}
-            </div>
+            <div class="value">$ {{ total_abonos }}</div>
         </div>
 
         <div class="card alerta">
             <h3>Capital en la Calle</h3>
-            <div class="value">
-                $ {{ "{:,.2f}".format(capital_en_calle or 0) }}
-            </div>
+            <div class="value">$ {{ capital_en_calle }}</div>
         </div>
 
         <div class="card">
             <h3>Intereses Generados</h3>
-            <div class="value">
-                $ {{ "{:,.2f}".format(total_interes or 0) }}
-            </div>
+            <div class="value">$ {{ total_interes }}</div>
         </div>
 
         <div class="card ganancia">
             <h3>Ganancia Real</h3>
-            <div class="value">
-                $ {{ "{:,.2f}".format(ganancia_real or 0) }}
-            </div>
+            <div class="value">$ {{ ganancia_real }}</div>
         </div>
 
         <div class="card proyectada">
             <h3>Ganancia Proyectada</h3>
-            <div class="value">
-                $ {{ "{:,.2f}".format(ganancia_proyectada or 0) }}
-            </div>
+            <div class="value">$ {{ ganancia_proyectada }}</div>
         </div>
 
     </div>

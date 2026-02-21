@@ -175,7 +175,7 @@ def estadisticas():
 
     conn.close()
 
-    ganancia_real = total_abonos - total_prestado
+    ganancia_real = total_abonos + total_prestado
     ganancia_proyectada = total_interes_generado
 
     return render_template("estadisticas.html",
