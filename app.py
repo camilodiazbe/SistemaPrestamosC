@@ -233,6 +233,50 @@ def estadisticas():
     c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos WHERE pagado = FALSE")
     capital_en_calle = float(c.fetchone()[0])
 
+      # =========================
+@app.route("/agregar", methods=["POST"])
+@login_required
+def agregar():
+    nombre = request.form.get("nombre")
+    cedula = request.form.get("cedula")
+    celular = request.form.get("celular")
+    monto = request.form.get("monto")
+    interes = request.form.get("interes")
+    fecha_prestamo = request.form.get("fecha_prestamo")
+    fecha_pago = request.form.get("fecha_pago")
+    medio = request.form.get("medio")
+    objeto = request.form.get("objeto")
+    tipo_prestamo = request.form.get("tipo_prestamo")
+    plazo_dias = request.form.get("plazo_dias") or 30
+
+    try:
+        monto = float(monto)
+        interes = float(interes)
+        plazo_dias = int(plazo_dias)
+        fecha_prestamo_dt = datetime.strptime(fecha_prestamo, "%Y-%m-%d").date()
+        fecha_pago_dt = datetime.strptime(fecha_pago, "%Y-%m-%d").date()
+        if monto <= 0 or interes < 0:
+            raise ValueError("Monto e interés inválidos")
+        if fecha_pago_dt < fecha_prestamo_dt:
+            raise ValueError("Fecha de pago no puede ser anterior a la de préstamo")
+    except Exception as e:
+        return f"Error en los datos ingresados: {e}", 400
+
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO prestamos (
+            nombre, cedula, celular, monto, interes, fecha_prestamo, fecha_pago, medio, objeto, tipo_prestamo, plazo_dias
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    """, (
+        nombre, cedula, celular, monto, interes, fecha_prestamo_dt, fecha_pago_dt, medio, objeto, tipo_prestamo, plazo_dias
+    ))
+    conn.commit()
+    conn.close()
+
+    return redirect("/")
+        # =========================
+
     # =========================
     # GANANCIA REAL CORRECTA
     # =========================
