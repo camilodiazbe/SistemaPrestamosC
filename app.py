@@ -217,7 +217,19 @@ def index():
 @app.route('/estadisticas')
 @login_required
 def estadisticas():
-    return "LA RUTA FUNCIONA"
+    try:
+        conn = get_connection()
+        c = conn.cursor()
+
+        c.execute("SELECT 1")
+        test = c.fetchone()[0]
+
+        conn.close()
+
+        return f"Conexión OK - Resultado: {test}"
+
+    except Exception as e:
+        return f"ERROR: {str(e)}"
 
     # Total capital prestado histórico
     c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos")
