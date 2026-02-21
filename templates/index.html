@@ -3,16 +3,78 @@
     
 <head>
 <title>Sistema de Préstamos</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
-body{font-family:Arial;background:#f4f4f4;padding:40px}
-.card{background:white;padding:20px;border-radius:12px;margin-bottom:20px}
-input, select{padding:8px;margin:5px}
-button{padding:10px 15px;background:black;color:white;border:none;border-radius:8px;cursor:pointer}
-table{width:100%;background:white;border-radius:12px;margin-top:20px;border-collapse:collapse;font-size:13px}
-th,td{padding:8px;text-align:center;border-bottom:1px solid #ddd}
+body{
+    font-family:Arial;
+    background:#f4f4f4;
+    padding:20px;
+    margin:0;
+}
+
+h2{
+    text-align:center;
+}
+
+.card{
+    background:white;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:20px;
+}
+
+input, select{
+    padding:8px;
+    margin:5px 0;
+    width:100%;
+    box-sizing:border-box;
+}
+
+button{
+    padding:10px 15px;
+    background:black;
+    color:white;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    width:100%;
+}
+
+.table-container{
+    overflow-x:auto;
+}
+
+table{
+    width:100%;
+    background:white;
+    border-radius:12px;
+    margin-top:20px;
+    border-collapse:collapse;
+    font-size:13px;
+    min-width:900px;
+}
+
+th,td{
+    padding:8px;
+    text-align:center;
+    border-bottom:1px solid #ddd;
+}
+
 .activo{color:green;font-weight:bold}
 .vencido{color:red;font-weight:bold}
 .pagado{color:blue;font-weight:bold}
+
+@media (min-width:768px){
+    input, select{
+        width:auto;
+    }
+
+    button{
+        width:auto;
+    }
+}
 </style>
 
 <script>
@@ -73,6 +135,7 @@ function calcularPreview(){
 </form>
 </div>
 
+<div class="table-container">
 <table>
 <tr>
 <th>Cliente</th>
@@ -161,6 +224,7 @@ function calcularPreview(){
 {% endfor %}
 
 </table>
+</div>
 
 </body>
 </html>
