@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html>
-    
 <head>
 <title>Sistema de Préstamos</title>
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -19,14 +17,33 @@ h2{
 }
 
 .top-bar{
-    text-align:right;
-    margin-bottom:10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:15px;
+}
+
+.menu-left a{
+    text-decoration:none;
+    margin-right:10px;
+}
+
+.menu-btn{
+    background:#2563eb;
+    color:white;
+    padding:8px 12px;
+    border-radius:8px;
+    border:none;
+    cursor:pointer;
 }
 
 .logout-btn{
     background:#444;
-    width:auto;
     padding:8px 12px;
+    color:white;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
 }
 
 .card{
@@ -101,9 +118,19 @@ function calcularPreview(){
 <body>
 
 <div class="top-bar">
-    <a href="/logout">
-        <button class="logout-btn">Cerrar sesión</button>
-    </a>
+
+    <div class="menu-left">
+        <a href="/estadisticas">
+            <button class="menu-btn">📊 Estadísticas</button>
+        </a>
+    </div>
+
+    <div>
+        <a href="/logout">
+            <button class="logout-btn">Cerrar sesión</button>
+        </a>
+    </div>
+
 </div>
 
 <h2>💰 Sistema de Préstamos Camilo Marrugo 💵</h2>
@@ -160,7 +187,7 @@ function calcularPreview(){
 <th>Celular</th>
 <th>Tipo</th>
 <th>Monto</th>
-<th>Porcentaje %</th>
+<th>%</th>
 <th>Medio</th>
 <th>Garantía</th>
 <th>Fecha Préstamo</th>
