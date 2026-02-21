@@ -1,17 +1,20 @@
-from flask import Flask, render_template, request, redirect, send_file, session
+from flask import Flask, render_template, request, redirect, session
 from datetime import datetime, timedelta
-import sqlite3
-import openpyxl
-from io import BytesIO
+import psycopg2
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import os
-import psycopg2
-
-
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave_super_segura_cambiar_en_produccion")
+
+DATABASE_URL = os.environ.get("postgresql://cmcash_user:OQFijCuQmKTdK21Y4GkNRojDzcVdt775@dpg-d6cs3jstgctc73ep6ju0-a/cmcash")
+
+# =========================
+# CONEXIÓN
+# =========================
+def get_connection():
+    return psycopg2.connect(DATABASE_URL)
 
 # =========================
 # PROTEGER RUTAS
@@ -28,23 +31,22 @@ def login_required(f):
 # INICIALIZAR BASE DE DATOS
 # =========================
 def init_db():
-    DATABASE_URL = os.environ.get("postgresql://cmcash_user:OQFijCuQmKTdK21Y4GkNRojDzcVdt775@dpg-d6cs3jstgctc73ep6ju0-a/cmcash")
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = get_connection()
     c = conn.cursor()
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS prestamos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             nombre TEXT,
             cedula TEXT,
             celular TEXT,
-            monto REAL,
-            interes REAL,
-            fecha_prestamo TEXT,
-            fecha_pago TEXT,
+            monto NUMERIC,
+            interes NUMERIC,
+            fecha_prestamo DATE,
+            fecha_pago DATE,
             medio TEXT,
             objeto TEXT,
-            pagado INTEGER DEFAULT 0,
+            pagado BOOLEAN DEFAULT FALSE,
             tipo_prestamo TEXT DEFAULT 'fijo',
             plazo_dias INTEGER DEFAULT 30
         )
@@ -52,23 +54,23 @@ def init_db():
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS abonos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            prestamo_id INTEGER,
-            fecha TEXT,
-            monto REAL
+            id SERIAL PRIMARY KEY,
+            prestamo_id INTEGER REFERENCES prestamos(id) ON DELETE CASCADE,
+            fecha DATE,
+            monto NUMERIC
         )
     ''')
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS configuracion (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mora_diaria REAL
+            id SERIAL PRIMARY KEY,
+            mora_diaria NUMERIC
         )
     ''')
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             usuario TEXT UNIQUE,
             password TEXT
         )
@@ -79,11 +81,17 @@ def init_db():
     if c.fetchone()[0] == 0:
         usuario = "admin"
         password = generate_password_hash("Monteria12####")
-        c.execute("INSERT INTO usuarios (usuario, password) VALUES (?, ?)", (usuario, password))
+        c.execute(
+            "INSERT INTO usuarios (usuario, password) VALUES (%s, %s)",
+            (usuario, password)
+        )
 
     c.execute("SELECT COUNT(*) FROM configuracion")
     if c.fetchone()[0] == 0:
-        c.execute("INSERT INTO configuracion (mora_diaria) VALUES (0.5)")
+        c.execute(
+            "INSERT INTO configuracion (mora_diaria) VALUES (%s)",
+            (0.5,)
+        )
 
     conn.commit()
     conn.close()
@@ -99,36 +107,19 @@ def login():
         usuario = request.form["usuario"]
         password = request.form["password"]
 
-        conn = sqlite3.connect('prestamos.db')
-        conn.row_factory = sqlite3.Row
+        conn = get_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM usuarios WHERE usuario = ?", (usuario,))
+        c.execute("SELECT id, password FROM usuarios WHERE usuario = %s", (usuario,))
         user = c.fetchone()
         conn.close()
 
-        if user and check_password_hash(user["password"], password):
-            session["usuario_id"] = user["id"]
+        if user and check_password_hash(user[1], password):
+            session["usuario_id"] = user[0]
             return redirect("/")
         else:
             return render_template("login.html", error="Credenciales incorrectas")
 
     return render_template("login.html")
-
-
-# =========================
-# CAMBIAR PASSWORD (PROTEGIDO)
-# =========================
-@app.route("/cambiar_password")
-@login_required
-def cambiar_password():
-    nueva = generate_password_hash("Monteria12####")
-    conn = sqlite3.connect('prestamos.db')
-    c = conn.cursor()
-    c.execute("UPDATE usuarios SET password = ?", (nueva,))
-    conn.commit()
-    conn.close()
-    return "Contraseña actualizada"
-
 
 # =========================
 # LOGOUT
@@ -139,18 +130,17 @@ def logout():
     session.clear()
     return redirect("/login")
 
-
 # =========================
 # CALCULAR MORA
 # =========================
 def calcular_mora(base, fecha_vencimiento, pagado):
-    if pagado == 1:
+    if pagado:
         return 0, 0
 
-    conn = sqlite3.connect('prestamos.db')
+    conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT mora_diaria FROM configuracion LIMIT 1")
-    mora_porcentaje = c.fetchone()[0]
+    mora_porcentaje = float(c.fetchone()[0])
     conn.close()
 
     hoy = datetime.now().date()
@@ -161,41 +151,44 @@ def calcular_mora(base, fecha_vencimiento, pagado):
 
     return 0, 0
 
-
 # =========================
-# PÁGINA PRINCIPAL
+# INDEX
 # =========================
 @app.route('/')
 @login_required
 def index():
-    conn = sqlite3.connect('prestamos.db')
-    conn.row_factory = sqlite3.Row
+    conn = get_connection()
     c = conn.cursor()
 
     c.execute("SELECT * FROM prestamos")
     prestamos = c.fetchall()
+
     prestamos_procesados = []
 
     for p in prestamos:
-        c.execute("SELECT SUM(monto) FROM abonos WHERE prestamo_id = ?", (p["id"],))
-        total_abonos = c.fetchone()[0] or 0
+        prestamo_id = p[0]
 
-        fecha_prestamo = datetime.strptime(p["fecha_prestamo"], "%Y-%m-%d").date()
+        c.execute("SELECT COALESCE(SUM(monto),0) FROM abonos WHERE prestamo_id = %s", (prestamo_id,))
+        total_abonos = float(c.fetchone()[0])
+
+        fecha_prestamo = p[6]
         hoy = datetime.now().date()
         dias_transcurridos = (hoy - fecha_prestamo).days
-        capital = p["monto"]
+        capital = float(p[4])
+        interes_porcentaje = float(p[5])
+        pagado = p[10]
 
-        if p["tipo_prestamo"] == "fijo":
-            fecha_vencimiento = fecha_prestamo + timedelta(days=p["plazo_dias"])
-            interes = capital * (p["interes"] / 100)
+        if p[11] == "fijo":
+            fecha_vencimiento = fecha_prestamo + timedelta(days=p[12])
+            interes = capital * (interes_porcentaje / 100)
             base = capital + interes
-            mora, dias = calcular_mora(base, fecha_vencimiento, p["pagado"])
+            mora, dias = calcular_mora(base, fecha_vencimiento, pagado)
             total_deuda = base + mora
             deuda_restante = max(total_deuda - total_abonos, 0)
             dias_restantes = (fecha_vencimiento - hoy).days
         else:
             ciclos = dias_transcurridos // 30
-            interes = capital * (p["interes"] / 100) * (ciclos + 1)
+            interes = capital * (interes_porcentaje / 100) * (ciclos + 1)
             total_deuda = capital + interes
             mora = 0
             dias = 0
@@ -203,18 +196,18 @@ def index():
             deuda_restante = max(total_deuda - total_abonos, 0)
 
         prestamos_procesados.append({
-            "id": p["id"],
-            "nombre": p["nombre"],
-            "cedula": p["cedula"],
-            "celular": p["celular"],
-            "monto": p["monto"],
-            "interes": p["interes"],
-            "fecha_prestamo": p["fecha_prestamo"],
-            "fecha_pago": p["fecha_pago"],
-            "medio": p["medio"],
-            "objeto": p["objeto"],
-            "pagado": p["pagado"],
-            "tipo_prestamo": p["tipo_prestamo"],
+            "id": p[0],
+            "nombre": p[1],
+            "cedula": p[2],
+            "celular": p[3],
+            "monto": capital,
+            "interes": interes_porcentaje,
+            "fecha_prestamo": p[6],
+            "fecha_pago": p[7],
+            "medio": p[8],
+            "objeto": p[9],
+            "pagado": pagado,
+            "tipo_prestamo": p[11],
             "mora": mora,
             "dias": dias,
             "dias_restantes": dias_restantes,
@@ -224,19 +217,19 @@ def index():
     conn.close()
     return render_template('index.html', prestamos=prestamos_procesados)
 
-
 # =========================
-# RUTAS PROTEGIDAS
+# AGREGAR
 # =========================
 @app.route('/agregar', methods=['POST'])
 @login_required
 def agregar():
-    conn = sqlite3.connect('prestamos.db')
+    conn = get_connection()
     c = conn.cursor()
+
     c.execute('''
         INSERT INTO prestamos
         (nombre, cedula, celular, monto, interes, fecha_prestamo, fecha_pago, medio, objeto, tipo_prestamo, plazo_dias)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ''', (
         request.form['nombre'],
         request.form['cedula'],
@@ -250,46 +243,58 @@ def agregar():
         request.form['tipo_prestamo'],
         int(request.form['plazo_dias'] or 30)
     ))
+
     conn.commit()
     conn.close()
     return redirect('/')
 
-
+# =========================
+# ABONAR
+# =========================
 @app.route('/abonar/<int:id>', methods=['POST'])
 @login_required
 def abonar(id):
-    monto_abono = float(request.form['abono'])
-    conn = sqlite3.connect('prestamos.db')
+    conn = get_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO abonos (prestamo_id, fecha, monto) VALUES (?, ?, ?)",
-              (id, datetime.now().strftime("%Y-%m-%d"), monto_abono))
+
+    c.execute(
+        "INSERT INTO abonos (prestamo_id, fecha, monto) VALUES (%s, %s, %s)",
+        (id, datetime.now().date(), float(request.form['abono']))
+    )
+
     conn.commit()
     conn.close()
     return redirect('/')
 
-
+# =========================
+# PAGAR
+# =========================
 @app.route('/pagar/<int:id>')
 @login_required
 def pagar(id):
-    conn = sqlite3.connect('prestamos.db')
+    conn = get_connection()
     c = conn.cursor()
-    c.execute("UPDATE prestamos SET pagado = 1 WHERE id = ?", (id,))
+    c.execute("UPDATE prestamos SET pagado = TRUE WHERE id = %s", (id,))
     conn.commit()
     conn.close()
     return redirect('/')
 
-
+# =========================
+# ELIMINAR
+# =========================
 @app.route('/eliminar/<int:id>')
 @login_required
 def eliminar(id):
-    conn = sqlite3.connect('prestamos.db')
+    conn = get_connection()
     c = conn.cursor()
-    c.execute("DELETE FROM prestamos WHERE id = ?", (id,))
+    c.execute("DELETE FROM prestamos WHERE id = %s", (id,))
     conn.commit()
     conn.close()
     return redirect('/')
 
-
+# =========================
+# RUN
+# =========================
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port)
