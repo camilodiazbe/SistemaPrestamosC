@@ -146,54 +146,7 @@ def calcular_mora(base, fecha_vencimiento, pagado):
         return round(mora, 2), dias_vencidos
 
     return 0, 0
-# =========================
-# 💰 MES PAGADO (solo indefinidos)
-# =========================
-@app.route("/mes_pagado/<int:id>")
-@login_required
-def mes_pagado(id):
-    conn = get_connection()
-    c = conn.cursor()
 
-    # Traer datos del préstamo
-    c.execute("SELECT monto, interes, tipo_prestamo FROM prestamos WHERE id = %s", (id,))
-    prestamo = c.fetchone()
-
-    if not prestamo:
-        conn.close()
-        return redirect("/")
-
-    capital = float(prestamo[0])
-    interes = float(prestamo[1])
-    tipo = prestamo[2]
-
-    # Solo aplicar si es indefinido
-    if tipo != "indefinido":
-        conn.close()
-        return redirect("/")
-
-    # Calcular interés mensual
-    interes_mes = capital * (interes / 100)
-
-    hoy = datetime.now().date()
-
-    # Registrar el pago del mes como abono
-    c.execute(
-        "INSERT INTO abonos (prestamo_id, fecha, monto) VALUES (%s, %s, %s)",
-        (id, hoy, interes_mes)
-    )
-
-    # Reiniciar contador cambiando fecha_prestamo a hoy
-    c.execute(
-        "UPDATE prestamos SET fecha_prestamo = %s WHERE id = %s",
-        (hoy, id)
-    )
-
-    conn.commit()
-    conn.close()
-
-    # Ir directo al dashboard
-    return redirect("/estadisticas")
 
 # =========================
 # INDEX
