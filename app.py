@@ -1,52 +1,31 @@
-from flask import Flask, render_template, request, redirect, session
+from flask import Flask, render_template, request, redirect, send_file
 from datetime import datetime, timedelta
-import psycopg2
-from werkzeug.security import generate_password_hash, check_password_hash
-from functools import wraps
-import os
+import sqlite3
+import openpyxl
+from io import BytesIO
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "clave_super_segura_cambiar_en_produccion")
-
-DATABASE_URL = os.environ.get("DATABASE_URL")
-
-# =========================
-# CONEXIÓN
-# =========================
-def get_connection():
-    return psycopg2.connect(DATABASE_URL)
-
-# =========================
-# PROTEGER RUTAS
-# =========================
-def login_required(f):
-    @wraps(f)
-    def wrap(*args, **kwargs):
-        if "usuario_id" not in session:
-            return redirect("/login")
-        return f(*args, **kwargs)
-    return wrap
 
 # =========================
 # INICIALIZAR BASE DE DATOS
 # =========================
 def init_db():
-    conn = get_connection()
+    conn = sqlite3.connect('prestamos.db')
     c = conn.cursor()
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS prestamos (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT,
             cedula TEXT,
             celular TEXT,
-            monto NUMERIC,
-            interes NUMERIC,
-            fecha_prestamo DATE,
-            fecha_pago DATE,
+            monto REAL,
+            interes REAL,
+            fecha_prestamo TEXT,
+            fecha_pago TEXT,
             medio TEXT,
             objeto TEXT,
-            pagado BOOLEAN DEFAULT FALSE,
+            pagado INTEGER DEFAULT 0,
             tipo_prestamo TEXT DEFAULT 'fijo',
             plazo_dias INTEGER DEFAULT 30
         )
@@ -54,40 +33,23 @@ def init_db():
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS abonos (
-            id SERIAL PRIMARY KEY,
-            prestamo_id INTEGER REFERENCES prestamos(id) ON DELETE CASCADE,
-            fecha DATE,
-            monto NUMERIC
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            prestamo_id INTEGER,
+            fecha TEXT,
+            monto REAL
         )
     ''')
 
     c.execute('''
         CREATE TABLE IF NOT EXISTS configuracion (
-            id SERIAL PRIMARY KEY,
-            mora_diaria NUMERIC
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mora_diaria REAL
         )
     ''')
-
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id SERIAL PRIMARY KEY,
-            usuario TEXT UNIQUE,
-            password TEXT
-        )
-    ''')
-
-    c.execute("SELECT COUNT(*) FROM usuarios")
-    if c.fetchone()[0] == 0:
-        usuario = "admin"
-        password = generate_password_hash("Monteria12####")
-        c.execute(
-            "INSERT INTO usuarios (usuario, password) VALUES (%s, %s)",
-            (usuario, password)
-        )
 
     c.execute("SELECT COUNT(*) FROM configuracion")
     if c.fetchone()[0] == 0:
-        c.execute("INSERT INTO configuracion (mora_diaria) VALUES (%s)", (0.5,))
+        c.execute("INSERT INTO configuracion (mora_diaria) VALUES (0.5)")
 
     conn.commit()
     conn.close()
@@ -95,48 +57,16 @@ def init_db():
 init_db()
 
 # =========================
-# LOGIN
-# =========================
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        usuario = request.form["usuario"]
-        password = request.form["password"]
-
-        conn = get_connection()
-        c = conn.cursor()
-        c.execute("SELECT id, password FROM usuarios WHERE usuario = %s", (usuario,))
-        user = c.fetchone()
-        conn.close()
-
-        if user and check_password_hash(user[1], password):
-            session["usuario_id"] = user[0]
-            return redirect("/")
-        else:
-            return render_template("login.html", error="Credenciales incorrectas")
-
-    return render_template("login.html")
-
-# =========================
-# LOGOUT
-# =========================
-@app.route("/logout")
-@login_required
-def logout():
-    session.clear()
-    return redirect("/login")
-
-# =========================
 # CALCULAR MORA
 # =========================
 def calcular_mora(base, fecha_vencimiento, pagado):
-    if pagado:
+    if pagado == 1:
         return 0, 0
 
-    conn = get_connection()
+    conn = sqlite3.connect('prestamos.db')
     c = conn.cursor()
     c.execute("SELECT mora_diaria FROM configuracion LIMIT 1")
-    mora_porcentaje = float(c.fetchone()[0])
+    mora_porcentaje = c.fetchone()[0]
     conn.close()
 
     hoy = datetime.now().date()
@@ -148,12 +78,12 @@ def calcular_mora(base, fecha_vencimiento, pagado):
     return 0, 0
 
 # =========================
-# INDEX
+# PÁGINA PRINCIPAL
 # =========================
 @app.route('/')
-@login_required
 def index():
-    conn = get_connection()
+    conn = sqlite3.connect('prestamos.db')
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
 
     c.execute("SELECT * FROM prestamos")
@@ -161,47 +91,49 @@ def index():
     prestamos_procesados = []
 
     for p in prestamos:
-        prestamo_id = p[0]
+        c.execute("SELECT SUM(monto) FROM abonos WHERE prestamo_id = ?", (p["id"],))
+        total_abonos = c.fetchone()[0] or 0
 
-        c.execute("SELECT COALESCE(SUM(monto),0) FROM abonos WHERE prestamo_id = %s", (prestamo_id,))
-        total_abonos = float(c.fetchone()[0])
-
-        fecha_prestamo = p[6]
+        fecha_prestamo = datetime.strptime(p["fecha_prestamo"], "%Y-%m-%d").date()
         hoy = datetime.now().date()
         dias_transcurridos = (hoy - fecha_prestamo).days
-        capital = float(p[4])
-        interes_porcentaje = float(p[5])
-        pagado = p[10]
 
-        if p[11] == "fijo":
-            fecha_vencimiento = fecha_prestamo + timedelta(days=p[12])
-            interes = capital * (interes_porcentaje / 100)
+        capital = p["monto"]
+
+        if p["tipo_prestamo"] == "fijo":
+            fecha_vencimiento = fecha_prestamo + timedelta(days=p["plazo_dias"])
+            interes = capital * (p["interes"] / 100)
             base = capital + interes
-            mora, dias = calcular_mora(base, fecha_vencimiento, pagado)
+            mora, dias = calcular_mora(base, fecha_vencimiento, p["pagado"])
             total_deuda = base + mora
-            deuda_restante = max(total_deuda - total_abonos, 0)
+            deuda_restante = total_deuda - total_abonos
+            if deuda_restante < 0:
+                deuda_restante = 0
             dias_restantes = (fecha_vencimiento - hoy).days
         else:
             ciclos = dias_transcurridos // 30
-            interes = capital * (interes_porcentaje / 100) * (ciclos + 1)
+            interes = capital * (p["interes"] / 100) * (ciclos + 1)
+            total_deuda = capital + interes
             mora = 0
             dias = 0
             dias_restantes = "∞"
-            deuda_restante = max((capital + interes) - total_abonos, 0)
+            deuda_restante = total_deuda - total_abonos
+            if deuda_restante < 0:
+                deuda_restante = 0
 
         prestamos_procesados.append({
-            "id": p[0],
-            "nombre": p[1],
-            "cedula": p[2],
-            "celular": p[3],
-            "monto": capital,
-            "interes": interes_porcentaje,
-            "fecha_prestamo": p[6],
-            "fecha_pago": p[7],
-            "medio": p[8],
-            "objeto": p[9],
-            "pagado": pagado,
-            "tipo_prestamo": p[11],
+            "id": p["id"],
+            "nombre": p["nombre"],
+            "cedula": p["cedula"],
+            "celular": p["celular"],
+            "monto": p["monto"],
+            "interes": p["interes"],
+            "fecha_prestamo": p["fecha_prestamo"],
+            "fecha_pago": p["fecha_pago"],
+            "medio": p["medio"],
+            "objeto": p["objeto"],
+            "pagado": p["pagado"],
+            "tipo_prestamo": p["tipo_prestamo"],
             "mora": mora,
             "dias": dias,
             "dias_restantes": dias_restantes,
@@ -212,49 +144,127 @@ def index():
     return render_template('index.html', prestamos=prestamos_procesados)
 
 # =========================
-# 📊 CONTROL REAL DE GANANCIAS
+# AGREGAR PRÉSTAMO
 # =========================
-@app.route('/estadisticas')
-@login_required
-def estadisticas():
-    conn = get_connection()
+@app.route('/agregar', methods=['POST'])
+def agregar():
+    conn = sqlite3.connect('prestamos.db')
     c = conn.cursor()
+    c.execute('''
+        INSERT INTO prestamos
+        (nombre, cedula, celular, monto, interes, fecha_prestamo, fecha_pago, medio, objeto, tipo_prestamo, plazo_dias)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        request.form['nombre'],
+        request.form['cedula'],
+        request.form['celular'],
+        float(request.form['monto']),
+        float(request.form['interes']),
+        request.form['fecha_prestamo'],
+        request.form['fecha_pago'],
+        request.form['medio'],
+        request.form['objeto'],
+        request.form['tipo_prestamo'],
+        int(request.form['plazo_dias'] or 30)
+    ))
+    conn.commit()
+    conn.close()
+    return redirect('/')
 
-    c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos")
-    total_prestado = float(c.fetchone()[0])
+# =========================
+# REGISTRAR ABONO
+# =========================
+@app.route('/abonar/<int:id>', methods=['POST'])
+def abonar(id):
+    monto_abono = float(request.form['abono'])
+    conn = sqlite3.connect('prestamos.db')
+    c = conn.cursor()
+    c.execute("INSERT INTO abonos (prestamo_id, fecha, monto) VALUES (?, ?, ?)",
+              (id, datetime.now().strftime("%Y-%m-%d"), monto_abono))
+    conn.commit()
+    conn.close()
+    return redirect('/')
 
-    c.execute("SELECT COALESCE(SUM(monto),0) FROM abonos")
-    total_abonos = float(c.fetchone()[0])
+# =========================
+# MARCAR COMO PAGADO
+# =========================
+@app.route('/pagar/<int:id>')
+def pagar(id):
+    conn = sqlite3.connect('prestamos.db')
+    c = conn.cursor()
+    c.execute("UPDATE prestamos SET pagado = 1 WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return redirect('/')
 
-    c.execute("SELECT monto, interes FROM prestamos")
+# =========================
+# ELIMINAR
+# =========================
+@app.route('/eliminar/<int:id>')
+def eliminar(id):
+    conn = sqlite3.connect('prestamos.db')
+    c = conn.cursor()
+    c.execute("DELETE FROM prestamos WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return redirect('/')
+
+# =========================
+# EXPORTAR GANANCIAS A EXCEL
+# =========================
+@app.route('/exportar')
+def exportar():
+    conn = sqlite3.connect('prestamos.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM prestamos")
     prestamos = c.fetchall()
 
-    total_interes_generado = 0
-    for p in prestamos:
-        capital = float(p[0])
-        interes = float(p[1])
-        total_interes_generado += capital * (interes / 100)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Ganancias"
 
-    c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos WHERE pagado = FALSE")
-    capital_en_calle = float(c.fetchone()[0])
+    headers = ["Cliente","Capital","Interés","Mora","Total Recuperado","Pendiente","Ganancia Real"]
+    ws.append(headers)
+
+    for p in prestamos:
+        c.execute("SELECT SUM(monto) FROM abonos WHERE prestamo_id = ?", (p["id"],))
+        total_abonos = c.fetchone()[0] or 0
+
+        capital = p["monto"]
+        interes = capital * (p["interes"]/100)
+        fecha_prestamo = datetime.strptime(p["fecha_prestamo"], "%Y-%m-%d").date()
+        fecha_vencimiento = fecha_prestamo + timedelta(days=p["plazo_dias"])
+        mora, _ = calcular_mora(capital+interes, fecha_vencimiento, p["pagado"])
+
+        total_deuda = capital + interes + mora
+        deuda_restante = total_deuda - total_abonos
+        if deuda_restante < 0:
+            deuda_restante = 0
+
+        total_recuperado = total_abonos
+        pendiente = deuda_restante
+        ganancia_real = interes + mora
+
+        ws.append([
+            p["nombre"],
+            capital,
+            round(interes,2),
+            round(mora,2),
+            round(total_recuperado,2),
+            round(pendiente,2),
+            round(ganancia_real,2)
+        ])
 
     conn.close()
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
 
-    ganancia_real = total_abonos - total_prestado
-    ganancia_proyectada = total_interes_generado
+    return send_file(output,
+                     attachment_filename="ganancias.xlsx",
+                     as_attachment=True,
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    return render_template("estadisticas.html",
-        total_prestado=round(total_prestado,2),
-        total_abonos=round(total_abonos,2),
-        total_interes=round(total_interes_generado,2),
-        capital_en_calle=round(capital_en_calle,2),
-        ganancia_real=round(ganancia_real,2),
-        ganancia_proyectada=round(ganancia_proyectada,2)
-    )
-
-# =========================
-# RUN
-# =========================
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=10000)
