@@ -243,6 +243,15 @@ function calcularPreview(){
 
 {% if p.pagado == 0 %}
 
+{% if p.tipo_prestamo == "indefinido" %}
+<br>
+<a href="/mes_pagado/{{p.id}}">
+<button style="background:green;margin-top:5px;">
+Mes Pagado
+</button>
+</a>
+{% endif %}
+
 <form method="POST" action="/abonar/{{p.id}}">
 <input name="abono" type="number" placeholder="Abono" required>
 <button type="submit">Abonar</button>
@@ -253,6 +262,7 @@ function calcularPreview(){
 <a href="/pagar/{{p.id}}">
 <button>Pagar Total</button>
 </a>
+
 
 {% endif %}
 
