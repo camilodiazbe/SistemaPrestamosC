@@ -217,8 +217,7 @@ def index():
 @app.route('/estadisticas')
 @login_required
 def estadisticas():
-    conn = get_connection()
-    c = conn.cursor()
+    return "LA RUTA FUNCIONA"
 
     # Total capital prestado histórico
     c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos")
