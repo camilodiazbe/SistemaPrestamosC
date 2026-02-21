@@ -4,7 +4,9 @@ import sqlite3
 import openpyxl
 from io import BytesIO
 from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 import os
+
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave_super_segura_cambiar_en_produccion")
@@ -13,11 +15,11 @@ app.secret_key = os.environ.get("SECRET_KEY", "clave_super_segura_cambiar_en_pro
 # PROTEGER RUTAS
 # =========================
 def login_required(f):
+    @wraps(f)
     def wrap(*args, **kwargs):
         if "usuario_id" not in session:
             return redirect("/login")
         return f(*args, **kwargs)
-    wrap.__name__ = f.__name__
     return wrap
 
 # =========================
@@ -61,7 +63,6 @@ def init_db():
         )
     ''')
 
-    # TABLA USUARIO ADMIN
     c.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,7 +110,13 @@ def login():
             return render_template("login.html", error="Credenciales incorrectas")
 
     return render_template("login.html")
+
+
+# =========================
+# CAMBIAR PASSWORD (PROTEGIDO)
+# =========================
 @app.route("/cambiar_password")
+@login_required
 def cambiar_password():
     nueva = generate_password_hash("Monteria12####")
     conn = sqlite3.connect('prestamos.db')
@@ -119,13 +126,16 @@ def cambiar_password():
     conn.close()
     return "Contraseña actualizada"
 
+
 # =========================
 # LOGOUT
 # =========================
 @app.route("/logout")
+@login_required
 def logout():
     session.clear()
     return redirect("/login")
+
 
 # =========================
 # CALCULAR MORA
@@ -147,6 +157,7 @@ def calcular_mora(base, fecha_vencimiento, pagado):
         return round(mora, 2), dias_vencidos
 
     return 0, 0
+
 
 # =========================
 # PÁGINA PRINCIPAL
@@ -210,8 +221,9 @@ def index():
     conn.close()
     return render_template('index.html', prestamos=prestamos_procesados)
 
+
 # =========================
-# PROTEGER LAS DEMÁS RUTAS
+# RUTAS PROTEGIDAS
 # =========================
 @app.route('/agregar', methods=['POST'])
 @login_required
@@ -239,6 +251,7 @@ def agregar():
     conn.close()
     return redirect('/')
 
+
 @app.route('/abonar/<int:id>', methods=['POST'])
 @login_required
 def abonar(id):
@@ -251,6 +264,7 @@ def abonar(id):
     conn.close()
     return redirect('/')
 
+
 @app.route('/pagar/<int:id>')
 @login_required
 def pagar(id):
@@ -261,6 +275,7 @@ def pagar(id):
     conn.close()
     return redirect('/')
 
+
 @app.route('/eliminar/<int:id>')
 @login_required
 def eliminar(id):
@@ -270,6 +285,7 @@ def eliminar(id):
     conn.commit()
     conn.close()
     return redirect('/')
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))

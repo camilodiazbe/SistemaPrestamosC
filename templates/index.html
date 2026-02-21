@@ -18,6 +18,17 @@ h2{
     text-align:center;
 }
 
+.top-bar{
+    text-align:right;
+    margin-bottom:10px;
+}
+
+.logout-btn{
+    background:#444;
+    width:auto;
+    padding:8px 12px;
+}
+
 .card{
     background:white;
     padding:20px;
@@ -88,6 +99,12 @@ function calcularPreview(){
 </script>
 </head>
 <body>
+
+<div class="top-bar">
+    <a href="/logout">
+        <button class="logout-btn">Cerrar sesión</button>
+    </a>
+</div>
 
 <h2>💰 Sistema de Préstamos Camilo Marrugo 💵</h2>
 
@@ -228,4 +245,3 @@ function calcularPreview(){
 
 </body>
 </html>
-
