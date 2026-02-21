@@ -212,7 +212,7 @@ def index():
     return render_template('index.html', prestamos=prestamos_procesados)
 
 # =========================
-# 📊 CONTROL REAL DE GANANCIAS
+# 📊 CONTROL REAL DE GANANCIAS (CORREGIDO PROFESIONAL)
 # =========================
 @app.route('/estadisticas')
 @login_required
@@ -220,28 +220,65 @@ def estadisticas():
     conn = get_connection()
     c = conn.cursor()
 
+    # Total capital prestado histórico
     c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos")
     total_prestado = float(c.fetchone()[0])
 
+    # Total dinero ingresado por abonos
     c.execute("SELECT COALESCE(SUM(monto),0) FROM abonos")
     total_abonos = float(c.fetchone()[0])
 
+    # Capital en la calle (préstamos no pagados)
+    c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos WHERE pagado = FALSE")
+    capital_en_calle = float(c.fetchone()[0])
+
+    # =========================
+    # GANANCIA REAL CORRECTA
+    # =========================
+
+    # Traemos préstamos y cuánto han abonado
+    c.execute("""
+        SELECT p.id, p.monto,
+               COALESCE(SUM(a.monto),0) as total_abonado
+        FROM prestamos p
+        LEFT JOIN abonos a ON p.id = a.prestamo_id
+        GROUP BY p.id
+    """)
+    datos = c.fetchall()
+
+    ganancia_real = 0
+
+    for prestamo_id, capital, abonado in datos:
+        capital = float(capital)
+        abonado = float(abonado)
+
+        if abonado > capital:
+            ganancia_real += (abonado - capital)
+
+    # =========================
+    # GANANCIA PROYECTADA
+    # =========================
+
+    c.execute("SELECT monto, interes FROM prestamos WHERE pagado = FALSE")
+    prestamos_activos = c.fetchall()
+
+    ganancia_proyectada = 0
+    for capital, interes in prestamos_activos:
+        capital = float(capital)
+        interes = float(interes)
+        ganancia_proyectada += capital * (interes / 100)
+
+    # Total interés histórico generado
     c.execute("SELECT monto, interes FROM prestamos")
     prestamos = c.fetchall()
 
     total_interes_generado = 0
-    for p in prestamos:
-        capital = float(p[0])
-        interes = float(p[1])
+    for capital, interes in prestamos:
+        capital = float(capital)
+        interes = float(interes)
         total_interes_generado += capital * (interes / 100)
 
-    c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos WHERE pagado = FALSE")
-    capital_en_calle = float(c.fetchone()[0])
-
     conn.close()
-
-    ganancia_real = total_abonos - total_prestado
-    ganancia_proyectada = total_interes_generado
 
     return render_template("estadisticas.html",
         total_prestado=round(total_prestado,2),
@@ -251,7 +288,6 @@ def estadisticas():
         ganancia_real=round(ganancia_real,2),
         ganancia_proyectada=round(ganancia_proyectada,2)
     )
-
 # =========================
 # RUN
 # =========================
