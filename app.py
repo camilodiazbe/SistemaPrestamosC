@@ -76,7 +76,6 @@ def init_db():
         )
     ''')
 
-    # Crear admin si no existe
     c.execute("SELECT COUNT(*) FROM usuarios")
     if c.fetchone()[0] == 0:
         usuario = "admin"
@@ -88,10 +87,7 @@ def init_db():
 
     c.execute("SELECT COUNT(*) FROM configuracion")
     if c.fetchone()[0] == 0:
-        c.execute(
-            "INSERT INTO configuracion (mora_diaria) VALUES (%s)",
-            (0.5,)
-        )
+        c.execute("INSERT INTO configuracion (mora_diaria) VALUES (%s)", (0.5,))
 
     conn.commit()
     conn.close()
@@ -162,7 +158,6 @@ def index():
 
     c.execute("SELECT * FROM prestamos")
     prestamos = c.fetchall()
-
     prestamos_procesados = []
 
     for p in prestamos:
@@ -189,11 +184,10 @@ def index():
         else:
             ciclos = dias_transcurridos // 30
             interes = capital * (interes_porcentaje / 100) * (ciclos + 1)
-            total_deuda = capital + interes
             mora = 0
             dias = 0
             dias_restantes = "∞"
-            deuda_restante = max(total_deuda - total_abonos, 0)
+            deuda_restante = max((capital + interes) - total_abonos, 0)
 
         prestamos_procesados.append({
             "id": p[0],
@@ -218,79 +212,45 @@ def index():
     return render_template('index.html', prestamos=prestamos_procesados)
 
 # =========================
-# AGREGAR
+# 📊 CONTROL REAL DE GANANCIAS
 # =========================
-@app.route('/agregar', methods=['POST'])
+@app.route('/estadisticas')
 @login_required
-def agregar():
+def estadisticas():
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute('''
-        INSERT INTO prestamos
-        (nombre, cedula, celular, monto, interes, fecha_prestamo, fecha_pago, medio, objeto, tipo_prestamo, plazo_dias)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ''', (
-        request.form['nombre'],
-        request.form['cedula'],
-        request.form['celular'],
-        float(request.form['monto']),
-        float(request.form['interes']),
-        request.form['fecha_prestamo'],
-        request.form['fecha_pago'],
-        request.form['medio'],
-        request.form['objeto'],
-        request.form['tipo_prestamo'],
-        int(request.form['plazo_dias'] or 30)
-    ))
+    c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos")
+    total_prestado = float(c.fetchone()[0])
 
-    conn.commit()
+    c.execute("SELECT COALESCE(SUM(monto),0) FROM abonos")
+    total_abonos = float(c.fetchone()[0])
+
+    c.execute("SELECT monto, interes FROM prestamos")
+    prestamos = c.fetchall()
+
+    total_interes_generado = 0
+    for p in prestamos:
+        capital = float(p[0])
+        interes = float(p[1])
+        total_interes_generado += capital * (interes / 100)
+
+    c.execute("SELECT COALESCE(SUM(monto),0) FROM prestamos WHERE pagado = FALSE")
+    capital_en_calle = float(c.fetchone()[0])
+
     conn.close()
-    return redirect('/')
 
-# =========================
-# ABONAR
-# =========================
-@app.route('/abonar/<int:id>', methods=['POST'])
-@login_required
-def abonar(id):
-    conn = get_connection()
-    c = conn.cursor()
+    ganancia_real = total_abonos - total_prestado
+    ganancia_proyectada = total_interes_generado
 
-    c.execute(
-        "INSERT INTO abonos (prestamo_id, fecha, monto) VALUES (%s, %s, %s)",
-        (id, datetime.now().date(), float(request.form['abono']))
+    return render_template("estadisticas.html",
+        total_prestado=round(total_prestado,2),
+        total_abonos=round(total_abonos,2),
+        total_interes=round(total_interes_generado,2),
+        capital_en_calle=round(capital_en_calle,2),
+        ganancia_real=round(ganancia_real,2),
+        ganancia_proyectada=round(ganancia_proyectada,2)
     )
-
-    conn.commit()
-    conn.close()
-    return redirect('/')
-
-# =========================
-# PAGAR
-# =========================
-@app.route('/pagar/<int:id>')
-@login_required
-def pagar(id):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("UPDATE prestamos SET pagado = TRUE WHERE id = %s", (id,))
-    conn.commit()
-    conn.close()
-    return redirect('/')
-
-# =========================
-# ELIMINAR
-# =========================
-@app.route('/eliminar/<int:id>')
-@login_required
-def eliminar(id):
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("DELETE FROM prestamos WHERE id = %s", (id,))
-    conn.commit()
-    conn.close()
-    return redirect('/')
 
 # =========================
 # RUN
