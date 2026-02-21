@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Login - Sistema de Préstamos</title>
+<style>
+body{font-family:Arial;background:#f4f4f4;padding:40px;text-align:center}
+.card{background:white;padding:30px;border-radius:12px;width:300px;margin:auto}
+input{padding:10px;margin:10px;width:90%}
+button{padding:10px 15px;background:black;color:white;border:none;border-radius:8px;cursor:pointer;width:100%}
+.error{color:red}
+</style>
+</head>
+<body>
+
+<div class="card">
+<h2>🔐 Iniciar Sesión</h2>
+
+<form method="POST">
+<input name="usuario" placeholder="Usuario" required>
+<input name="password" type="password" placeholder="Contraseña" required>
+<button type="submit">Entrar</button>
+</form>
+
+{% if error %}
+<p class="error">{{error}}</p>
+{% endif %}
+
+</div>
+
+</body>
+</html>
