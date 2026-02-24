@@ -4,6 +4,10 @@ import psycopg2
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import os
+import pandas as pd
+import io
+from flask import send_file
+import os
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave_super_segura_cambiar_en_produccion")
@@ -234,120 +238,48 @@ def estadisticas():
         ganancia_real=round(ganancia_real,2),
         ganancia_proyectada=round(ganancia_proyectada,2)
     )
-# =========================
-# EXPORTAR REPORTE MENSUAL
-# =========================
-@app.route("/reporte_excel")
-def reporte_excel():
+#------------------------
+#EXPORTAR TODA LA BASE DE DATOS A EXCEL
+#------------------------
+@app.route('/exportar_base_completa')
+def exportar_base_completa():
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
 
-    conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM prestamos")
-    prestamos = cursor.fetchall()
+        # Obtener todas las tablas públicas
+        cursor.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema='public'
+        """)
+        tablas = cursor.fetchall()
 
-    mes_actual = datetime.now().month
-    año_actual = datetime.now().year
+        output = io.BytesIO()
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Reporte Mensual"
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            for tabla in tablas:
+                nombre_tabla = tabla[0]
 
-    ws.append([
-        "Cliente","Cédula","Celular","Tipo",
-        "Monto","Interés %","Mora","Total",
-        "Ganancia","Fecha Préstamo"
-    ])
+                df = pd.read_sql_query(
+                    f"SELECT * FROM {nombre_tabla}",
+                    conn
+                )
 
-    total_prestado = 0
-    total_recuperado = 0
-    total_ganancia = 0
+                df.to_excel(writer, sheet_name=nombre_tabla[:31], index=False)
 
-    for p in prestamos:
-        fecha = datetime.strptime(p["fecha_prestamo"], "%Y-%m-%d")
+        conn.close()
+        output.seek(0)
 
-        if fecha.month == mes_actual and fecha.year == año_actual:
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name="base_datos_completa.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
-            total_prestado += p["monto"]
-
-            if p["pagado"] == 1:
-                ganancia = p["total"] - p["monto"]
-                total_ganancia += ganancia
-                total_recuperado += p["total"]
-            else:
-                ganancia = 0
-
-            ws.append([
-                p["nombre"], p["cedula"], p["celular"],
-                p["tipo_prestamo"], p["monto"],
-                p["interes"], p["mora"],
-                p["total"], ganancia,
-                p["fecha_prestamo"]
-            ])
-
-    ws.append([])
-    ws.append(["TOTAL PRESTADO", total_prestado])
-    ws.append(["TOTAL RECUPERADO", total_recuperado])
-    ws.append(["GANANCIA DEL MES", total_ganancia])
-
-    conn.close()
-
-    archivo = io.BytesIO()
-    wb.save(archivo)
-    archivo.seek(0)
-
-    return send_file(archivo,
-                     download_name="reporte_mensual.xlsx",
-                     as_attachment=True)
-# =========================
-# EXPORTAR TODA LA BASE
-# =========================
-@app.route("/exportar_todo")
-def exportar_todo():
-
-    conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM prestamos")
-    prestamos = cursor.fetchall()
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Base Completa"
-
-    ws.append([
-        "ID","Cliente","Cédula","Celular","Tipo",
-        "Monto","Interés %","Mora","Días Vencidos",
-        "Fecha Préstamo","Fecha Pago",
-        "Total","Pagado","Medio","Garantía"
-    ])
-
-    for p in prestamos:
-        ws.append([
-            p["id"],
-            p["nombre"],
-            p["cedula"],
-            p["celular"],
-            p["tipo_prestamo"],
-            p["monto"],
-            p["interes"],
-            p["mora"],
-            p["dias"],
-            p["fecha_prestamo"],
-            p["fecha_pago"],
-            p["total"],
-            p["pagado"],
-            p["medio"],
-            p["objeto"]
-        ])
-
-    conn.close()
-
-    archivo = io.BytesIO()
-    wb.save(archivo)
-    archivo.seek(0)
-
-    return send_file(archivo,
-                     download_name="base_completa_prestamos.xlsx",
-                     as_attachment=True)
+    except Exception as e:
+        return str(e), 500
 # =========================
 # CALCULAR MORA
 # =========================
