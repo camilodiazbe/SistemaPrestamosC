@@ -235,6 +235,120 @@ def estadisticas():
         ganancia_proyectada=round(ganancia_proyectada,2)
     )
 # =========================
+# EXPORTAR REPORTE MENSUAL
+# =========================
+@app.route("/reporte_excel")
+def reporte_excel():
+
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM prestamos")
+    prestamos = cursor.fetchall()
+
+    mes_actual = datetime.now().month
+    año_actual = datetime.now().year
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Reporte Mensual"
+
+    ws.append([
+        "Cliente","Cédula","Celular","Tipo",
+        "Monto","Interés %","Mora","Total",
+        "Ganancia","Fecha Préstamo"
+    ])
+
+    total_prestado = 0
+    total_recuperado = 0
+    total_ganancia = 0
+
+    for p in prestamos:
+        fecha = datetime.strptime(p["fecha_prestamo"], "%Y-%m-%d")
+
+        if fecha.month == mes_actual and fecha.year == año_actual:
+
+            total_prestado += p["monto"]
+
+            if p["pagado"] == 1:
+                ganancia = p["total"] - p["monto"]
+                total_ganancia += ganancia
+                total_recuperado += p["total"]
+            else:
+                ganancia = 0
+
+            ws.append([
+                p["nombre"], p["cedula"], p["celular"],
+                p["tipo_prestamo"], p["monto"],
+                p["interes"], p["mora"],
+                p["total"], ganancia,
+                p["fecha_prestamo"]
+            ])
+
+    ws.append([])
+    ws.append(["TOTAL PRESTADO", total_prestado])
+    ws.append(["TOTAL RECUPERADO", total_recuperado])
+    ws.append(["GANANCIA DEL MES", total_ganancia])
+
+    conn.close()
+
+    archivo = io.BytesIO()
+    wb.save(archivo)
+    archivo.seek(0)
+
+    return send_file(archivo,
+                     download_name="reporte_mensual.xlsx",
+                     as_attachment=True)
+# =========================
+# EXPORTAR TODA LA BASE
+# =========================
+@app.route("/exportar_todo")
+def exportar_todo():
+
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM prestamos")
+    prestamos = cursor.fetchall()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Base Completa"
+
+    ws.append([
+        "ID","Cliente","Cédula","Celular","Tipo",
+        "Monto","Interés %","Mora","Días Vencidos",
+        "Fecha Préstamo","Fecha Pago",
+        "Total","Pagado","Medio","Garantía"
+    ])
+
+    for p in prestamos:
+        ws.append([
+            p["id"],
+            p["nombre"],
+            p["cedula"],
+            p["celular"],
+            p["tipo_prestamo"],
+            p["monto"],
+            p["interes"],
+            p["mora"],
+            p["dias"],
+            p["fecha_prestamo"],
+            p["fecha_pago"],
+            p["total"],
+            p["pagado"],
+            p["medio"],
+            p["objeto"]
+        ])
+
+    conn.close()
+
+    archivo = io.BytesIO()
+    wb.save(archivo)
+    archivo.seek(0)
+
+    return send_file(archivo,
+                     download_name="base_completa_prestamos.xlsx",
+                     as_attachment=True)
+# =========================
 # CALCULAR MORA
 # =========================
 def calcular_mora(base, fecha_vencimiento, pagado):
