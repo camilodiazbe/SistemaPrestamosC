@@ -95,13 +95,12 @@ th,td{
 
 <script>
 function calcularPreview(){
-    function calcularPreview(){
     let monto = parseFloat(document.getElementById("monto").value) || 0;
     let interes = parseFloat(document.getElementById("interes").value) || 0;
     let total = monto + (monto * interes / 100);
+
     document.getElementById("preview").innerText =
         "Total sin mora: $" + total.toFixed(2);
-}
 }
 
 /* =========================
@@ -129,10 +128,6 @@ function actualizarFechaPago(){
     }
 }
 
-
-
-
-
 /* =========================
    MODAL EDITAR
 ========================= */
@@ -157,6 +152,7 @@ function abrirModal(id,nombre,cedula,celular,monto,interes,fecha_prestamo,fecha_
 function cerrarModal(){
     document.getElementById("modalEditar").style.display = "none";
 }
+
 </script>
 </head>
 <body>
