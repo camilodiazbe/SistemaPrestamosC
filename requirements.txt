@@ -5,4 +5,3 @@ psycopg2-binary
 pandas
 xlsxwriter
 Werkzeug
-Flask-Login
