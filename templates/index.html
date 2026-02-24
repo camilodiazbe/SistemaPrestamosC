@@ -95,12 +95,42 @@ th,td{
 
 <script>
 function calcularPreview(){
+    function calcularPreview(){
     let monto = parseFloat(document.getElementById("monto").value) || 0;
     let interes = parseFloat(document.getElementById("interes").value) || 0;
     let total = monto + (monto * interes / 100);
     document.getElementById("preview").innerText =
         "Total sin mora: $" + total.toFixed(2);
 }
+
+/* =========================
+   CALCULAR FECHA AUTOMÁTICA
+========================= */
+function actualizarFechaPago(){
+
+    let fechaPrestamoInput = document.querySelector("input[name='fecha_prestamo']");
+    let plazoInput = document.querySelector("input[name='plazo_dias']");
+    let fechaPagoInput = document.querySelector("input[name='fecha_pago']");
+
+    let fechaPrestamo = fechaPrestamoInput.value;
+    let plazo = parseInt(plazoInput.value);
+
+    if(fechaPrestamo && plazo > 0){
+
+        let fecha = new Date(fechaPrestamo);
+        fecha.setDate(fecha.getDate() + plazo);
+
+        let año = fecha.getFullYear();
+        let mes = String(fecha.getMonth() + 1).padStart(2,'0');
+        let dia = String(fecha.getDate()).padStart(2,'0');
+
+        fechaPagoInput.value = `${año}-${mes}-${dia}`;
+    }
+}
+}
+
+
+
 
 /* =========================
    MODAL EDITAR
@@ -155,7 +185,8 @@ function cerrarModal(){
 <input id="monto" name="monto" type="number" placeholder="Monto" onkeyup="calcularPreview()" required>
 <input id="interes" name="interes" type="number" placeholder="% Interés" onkeyup="calcularPreview()" required>
 
-<input name="fecha_prestamo" type="date" required>
+<input name="fecha_prestamo" type="date" required
+onchange="actualizarFechaPago()">
 <input name="fecha_pago" type="date" required>
 
 <input name="medio" placeholder="Nequi / Efectivo" required>
@@ -166,7 +197,9 @@ function cerrarModal(){
 <option value="indefinido">Préstamo indefinido</option>
 </select>
 
-<input name="plazo_dias" type="number" placeholder="Plazo en días (si es fijo)">
+<input name="plazo_dias" type="number" 
+placeholder="Plazo en días (si es fijo)"
+onkeyup="actualizarFechaPago()">
 
 <p id="preview"></p>
 <button type="submit">Registrar</button>
