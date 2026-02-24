@@ -255,6 +255,23 @@ Mes Pagado
 {% endif %}
 
 <br>
+<br>
+
+<button onclick="abrirModal(
+'{{p.id}}',
+'{{p.nombre}}',
+'{{p.cedula}}',
+'{{p.celular}}',
+'{{p.monto}}',
+'{{p.interes}}',
+'{{p.fecha_prestamo}}',
+'{{p.fecha_pago}}',
+'{{p.medio}}',
+'{{p.objeto}}',
+'{{p.tipo_prestamo}}'
+)" style="background:#2563eb;margin-top:5px;">
+Editar
+</button>
 
 <a href="/eliminar/{{p.id}}">
 <button style="background:red;margin-top:5px;">Eliminar</button>
@@ -266,6 +283,76 @@ Mes Pagado
 {% endfor %}
 
 </table>
+</div>
+
+<!-- MODAL EDITAR -->
+<div id="modalEditar" style="display:none; position:fixed; top:5%; left:50%; transform:translateX(-50%); background:white; padding:20px; border-radius:12px; width:90%; max-width:500px; box-shadow:0 0 15px rgba(0,0,0,0.3); z-index:1000;">
+
+<h3>Editar Préstamo</h3>
+
+<form method="POST" id="formEditar">
+
+<input name="nombre" id="edit_nombre" required>
+<input name="cedula" id="edit_cedula" required>
+<input name="celular" id="edit_celular" required>
+
+<input name="monto" id="edit_monto" type="number" required>
+<input name="interes" id="edit_interes" type="number" required>
+
+<input name="fecha_prestamo" id="edit_fecha_prestamo" type="date" required>
+<input name="fecha_pago" id="edit_fecha_pago" type="date" required>
+
+<input name="medio" id="edit_medio" required>
+<input name="objeto" id="edit_objeto" required>
+
+<select name="tipo_prestamo" id="edit_tipo">
+    <option value="fijo">Préstamo con plazo</option>
+    <option value="indefinido">Préstamo indefinido</option>
+</select>
+
+<input name="plazo_dias" id="edit_plazo" type="number">
+
+<br><br>
+
+<button type="submit" style="background:#2563eb;">Guardar Cambios</button>
+<button type="button" onclick="cerrarModal()" style="background:#444;margin-top:5px;">Cancelar</button>
+
+</form>
+</div>
+
+<!-- MODAL EDITAR -->
+<div id="modalEditar" style="display:none; position:fixed; top:5%; left:50%; transform:translateX(-50%); background:white; padding:20px; border-radius:12px; width:90%; max-width:500px; box-shadow:0 0 15px rgba(0,0,0,0.3); z-index:1000;">
+
+<h3>Editar Préstamo</h3>
+
+<form method="POST" id="formEditar">
+
+<input name="nombre" id="edit_nombre" required>
+<input name="cedula" id="edit_cedula" required>
+<input name="celular" id="edit_celular" required>
+
+<input name="monto" id="edit_monto" type="number" required>
+<input name="interes" id="edit_interes" type="number" required>
+
+<input name="fecha_prestamo" id="edit_fecha_prestamo" type="date" required>
+<input name="fecha_pago" id="edit_fecha_pago" type="date" required>
+
+<input name="medio" id="edit_medio" required>
+<input name="objeto" id="edit_objeto" required>
+
+<select name="tipo_prestamo" id="edit_tipo">
+    <option value="fijo">Préstamo con plazo</option>
+    <option value="indefinido">Préstamo indefinido</option>
+</select>
+
+<input name="plazo_dias" id="edit_plazo" type="number">
+
+<br><br>
+
+<button type="submit" style="background:#2563eb;">Guardar Cambios</button>
+<button type="button" onclick="cerrarModal()" style="background:#444;margin-top:5px;">Cancelar</button>
+
+</form>
 </div>
 
 </body>
