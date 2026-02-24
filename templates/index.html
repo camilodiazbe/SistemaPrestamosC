@@ -252,12 +252,13 @@ onkeyup="actualizarFechaPago()">
 —
 {% elif p.dias_restantes > 0 %}
 {{p.dias_restantes}} días
-{% else %}
+{% else %} 
 0 días
-{% endif %}
+{% endif %} 
 </td>
 
-<td><strong>${{p.total | cop}}</strong></td>
+
+<td><strong>{{ p.total | cop }}</strong></td>
 
 <td>
 {% if p.pagado == 1 %}
