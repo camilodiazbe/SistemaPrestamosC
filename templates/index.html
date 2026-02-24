@@ -102,6 +102,7 @@ function calcularPreview(){
     document.getElementById("preview").innerText =
         "Total sin mora: $" + total.toFixed(2);
 }
+}
 
 /* =========================
    CALCULAR FECHA AUTOMÁTICA
@@ -127,7 +128,7 @@ function actualizarFechaPago(){
         fechaPagoInput.value = `${año}-${mes}-${dia}`;
     }
 }
-}
+
 
 
 
@@ -187,7 +188,7 @@ function cerrarModal(){
 
 <input name="fecha_prestamo" type="date" required
 onchange="actualizarFechaPago()">
-<input name="fecha_pago" type="date" required>
+<input name="fecha_pago" type="date" readonly style="background:#eee;">
 
 <input name="medio" placeholder="Nequi / Efectivo" required>
 <input name="objeto" placeholder="Objeto en garantía" required>
