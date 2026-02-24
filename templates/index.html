@@ -134,6 +134,10 @@ function calcularPreview(){
 </div>
 
 <h2>💰 Sistema de Préstamos Camilo Marrugo 💵</h2>
+
+<button onclick="window.location.href='/exportar_base_completa'">
+    Descargar Base Completa en Excel
+</button>
 <a href="/reporte_excel">
 <button style="background:green;margin-bottom:10px;">
 📊 Descargar Reporte Mensual
@@ -146,21 +150,7 @@ function calcularPreview(){
 </button>
 </a>
 
-<div class="card">
-<h3>📊 Reportes Financieros</h3>
 
-<a href="/exportar_historico">
-<button>Descargar Reporte Histórico</button>
-</a>
-
-<br><br>
-
-<form method="POST" action="/exportar_fechas">
-<input type="date" name="fecha_inicio" required>
-<input type="date" name="fecha_fin" required>
-<button type="submit">Descargar Reporte por Fechas</button>
-</form>
-</div>
 
 <div class="card">
 <h3>Registrar Préstamo</h3>
