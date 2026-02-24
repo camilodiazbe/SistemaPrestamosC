@@ -257,6 +257,9 @@ Mes Pagado
 <br>
 <br>
 
+{% if p.pagado == 0 %}
+<br>
+
 <button onclick="abrirModal(
 '{{p.id}}',
 '{{p.nombre}}',
@@ -272,6 +275,7 @@ Mes Pagado
 )" style="background:#2563eb;margin-top:5px;">
 Editar
 </button>
+{% endif %}
 
 <a href="/eliminar/{{p.id}}">
 <button style="background:red;margin-top:5px;">Eliminar</button>

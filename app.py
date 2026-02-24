@@ -133,6 +133,64 @@ def login():
 def logout():
     session.clear()
     return redirect("/login")
+
+# =========================
+# EDITAR PRESTAMO
+# =========================
+@app.route('/editar_prestamo/<int:id>', methods=['POST'])
+@login_required
+def editar_prestamo(id):
+    conn = get_connection()
+    c = conn.cursor()
+
+    # 🔒 Verificar si está pagado
+    c.execute("SELECT pagado FROM prestamos WHERE id = %s", (id,))
+    resultado = c.fetchone()
+
+    if not resultado:
+        conn.close()
+        return redirect('/')
+
+    if resultado[0] == True:
+        conn.close()
+        return redirect('/')  # Bloquea edición si ya está pagado
+
+    # Si NO está pagado, permitir edición
+    c.execute("""
+        UPDATE prestamos
+        SET nombre = %s,
+            cedula = %s,
+            celular = %s,
+            monto = %s,
+            interes = %s,
+            fecha_prestamo = %s,
+            fecha_pago = %s,
+            medio = %s,
+            objeto = %s,
+            tipo_prestamo = %s,
+            plazo_dias = %s
+        WHERE id = %s
+    """, (
+        request.form['nombre'],
+        request.form['cedula'],
+        request.form['celular'],
+        float(request.form['monto']),
+        float(request.form['interes']),
+        request.form['fecha_prestamo'],
+        request.form['fecha_pago'],
+        request.form['medio'],
+        request.form['objeto'],
+        request.form['tipo_prestamo'],
+        int(request.form['plazo_dias'] or 30),
+        id
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect('/')
+
+
 # =========================
 # 💰 MES PAGADO (solo indefinidos)
 # =========================
