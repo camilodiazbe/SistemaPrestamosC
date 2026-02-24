@@ -99,8 +99,14 @@ function calcularPreview(){
     let interes = parseFloat(document.getElementById("interes").value) || 0;
     let total = monto + (monto * interes / 100);
 
+    let formatoCOP = new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 2
+    });
+
     document.getElementById("preview").innerText =
-        "Total sin mora: $" + total.toFixed(2);
+        "Total sin mora: " + formatoCOP.format(total);
 }
 
 /* =========================

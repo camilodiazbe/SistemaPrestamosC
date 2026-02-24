@@ -13,6 +13,10 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave_super_segura_cambiar_en_produccion")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
+#--------------------------
+def formato_cop(valor):
+    return "${:,.2f}".format(valor).replace(",", "X").replace(".", ",").replace("X", ".")
+#--------------------------
 
 # =========================
 # CONEXIÓN
