@@ -24,6 +24,73 @@ app.secret_key = os.environ.get("SECRET_KEY", "clave_super_segura_cambiar_en_pro
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 
+
+# =========================
+# 📊 REPORTE POR FECHA (GANANCIAS)
+# =========================
+@app.route("/reporte_corte", methods=["POST"])
+@login_required
+def reporte_corte():
+
+    fecha_inicio = request.form["fecha_inicio"]
+    fecha_fin = request.form["fecha_fin"]
+
+    fecha_inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+    fecha_fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+
+    # 🔒 VALIDACIÓN
+    if fecha_inicio > fecha_fin:
+        return "La fecha inicio no puede ser mayor que la fecha fin"
+
+    conn = get_connection()
+    c = conn.cursor()
+
+    # Traer abonos dentro del rango
+    c.execute("""
+        SELECT a.fecha, p.nombre, a.monto
+        FROM abonos a
+        JOIN prestamos p ON a.prestamo_id = p.id
+        WHERE a.fecha BETWEEN %s AND %s
+        ORDER BY a.fecha ASC
+    """, (fecha_inicio, fecha_fin))
+
+    registros = c.fetchall()
+
+    # Total ganado en ese rango
+    c.execute("""
+        SELECT COALESCE(SUM(monto),0)
+        FROM abonos
+        WHERE fecha BETWEEN %s AND %s
+    """, (fecha_inicio, fecha_fin))
+
+    total_ganado = float(c.fetchone()[0])
+
+    conn.close()
+
+    # =========================
+    # CREAR EXCEL
+    # =========================
+    output = io.BytesIO()
+
+    df = pd.DataFrame(registros, columns=["Fecha", "Cliente", "Monto"])
+
+    # Agregar fila de total
+    df_total = pd.DataFrame([["", "TOTAL GANADO", total_ganado]], 
+                            columns=["Fecha", "Cliente", "Monto"])
+
+    df = pd.concat([df, df_total])
+
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name="Reporte")
+
+    output.seek(0)
+
+    return send_file(
+        output,
+        download_name="reporte_ganancias.xlsx",
+        as_attachment=True
+    )
+
 # =========================
 # CONEXIÓN
 # =========================
