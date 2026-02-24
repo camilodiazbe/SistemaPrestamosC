@@ -8,15 +8,21 @@ import pandas as pd
 import io
 from flask import send_file
 import os
+#--------------------------
+#PESOS COP
+#--------------------------
+def formato_cop(valor):
+    if valor is None:
+        return "$ 0,00"
+    return "$ {:,.2f}".format(float(valor)).replace(",", "X").replace(".", ",").replace("X", ".")
 
 app = Flask(__name__)
+#FILTRO JINJA PARA FORMATO COP
+app.jinja_env.filters['cop'] = formato_cop
 app.secret_key = os.environ.get("SECRET_KEY", "clave_super_segura_cambiar_en_produccion")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-#--------------------------
-def formato_cop(valor):
-    return "${:,.2f}".format(valor).replace(",", "X").replace(".", ",").replace("X", ".")
-#--------------------------
+
 
 # =========================
 # CONEXIÓN

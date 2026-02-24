@@ -98,32 +98,32 @@
 
         <div class="card">
             <h3>Total Capital Prestado</h3>
-            <div class="value">$ {{ total_prestado }}</div>
+            <div class="value">$ {{ total_prestado | cop }}</div>
         </div>
 
         <div class="card">
             <h3>Total Dinero Recuperado</h3>
-            <div class="value">$ {{ total_abonos }}</div>
+            <div class="value">$ {{ total_abonos | cop }}</div>
         </div>
 
         <div class="card alerta">
             <h3>Capital en la Calle</h3>
-            <div class="value">$ {{ capital_en_calle }}</div>
+            <div class="value">$ {{ capital_en_calle | cop }}</div>
         </div>
 
         <div class="card">
             <h3>Intereses Generados</h3>
-            <div class="value">$ {{ total_interes }}</div>
+            <div class="value">$ {{ total_interes | cop }}</div>
         </div>
 
         <div class="card ganancia">
             <h3>Ganancia Real</h3>
-            <div class="value">$ {{ ganancia_real }}</div>
+            <div class="value">$ {{ ganancia_real | cop }}</div>
         </div>
 
         <div class="card proyectada">
             <h3>Ganancia Proyectada</h3>
-            <div class="value">$ {{ ganancia_proyectada }}</div>
+            <div class="value">$ {{ ganancia_proyectada | cop }}</div>
         </div>
 
     </div>
