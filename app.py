@@ -8,8 +8,7 @@ import pandas as pd
 import io
 from flask import send_file
 import os
-from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
-#--------------------------
+
 #PESOS COP
 #--------------------------
 def formato_cop(valor):
@@ -23,6 +22,17 @@ app.jinja_env.filters['cop'] = formato_cop
 app.secret_key = os.environ.get("SECRET_KEY", "clave_super_segura_cambiar_en_produccion")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# =========================
+# PROTEGER RUTAS
+# =========================
+def login_required(f):
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        if "usuario_id" not in session:
+            return redirect("/login")
+        return f(*args, **kwargs)
+    return wrap
 
 
 
@@ -98,16 +108,7 @@ def reporte_corte():
 def get_connection():
     return psycopg2.connect(DATABASE_URL)
 
-# =========================
-# PROTEGER RUTAS
-# =========================
-def login_required(f):
-    @wraps(f)
-    def wrap(*args, **kwargs):
-        if "usuario_id" not in session:
-            return redirect("/login")
-        return f(*args, **kwargs)
-    return wrap
+
 
 # =========================
 # INICIALIZAR BASE DE DATOS
