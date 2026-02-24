@@ -12,9 +12,7 @@ body{
     margin:0;
 }
 
-h2{
-    text-align:center;
-}
+h2{text-align:center;}
 
 .top-bar{
     display:flex;
@@ -23,10 +21,7 @@ h2{
     margin-bottom:15px;
 }
 
-.menu-left a{
-    text-decoration:none;
-    margin-right:10px;
-}
+.menu-left a{text-decoration:none;margin-right:10px;}
 
 .menu-btn{
     background:#2563eb;
@@ -70,9 +65,7 @@ button{
     width:100%;
 }
 
-.table-container{
-    overflow-x:auto;
-}
+.table-container{overflow-x:auto;}
 
 table{
     width:100%;
@@ -95,13 +88,8 @@ th,td{
 .pagado{color:blue;font-weight:bold}
 
 @media (min-width:768px){
-    input, select{
-        width:auto;
-    }
-
-    button{
-        width:auto;
-    }
+    input, select{width:auto;}
+    button{width:auto;}
 }
 </style>
 
@@ -110,34 +98,52 @@ function calcularPreview(){
     let monto = parseFloat(document.getElementById("monto").value) || 0;
     let interes = parseFloat(document.getElementById("interes").value) || 0;
     let total = monto + (monto * interes / 100);
-    document.getElementById("preview").innerText = 
+    document.getElementById("preview").innerText =
         "Total sin mora: $" + total.toFixed(2);
+}
+
+/* =========================
+   MODAL EDITAR
+========================= */
+function abrirModal(id,nombre,cedula,celular,monto,interes,fecha_prestamo,fecha_pago,medio,objeto,tipo){
+
+    document.getElementById("formEditar").action = "/editar_prestamo/" + id;
+
+    document.getElementById("edit_nombre").value = nombre;
+    document.getElementById("edit_cedula").value = cedula;
+    document.getElementById("edit_celular").value = celular;
+    document.getElementById("edit_monto").value = monto;
+    document.getElementById("edit_interes").value = interes;
+    document.getElementById("edit_fecha_prestamo").value = fecha_prestamo;
+    document.getElementById("edit_fecha_pago").value = fecha_pago;
+    document.getElementById("edit_medio").value = medio;
+    document.getElementById("edit_objeto").value = objeto;
+    document.getElementById("edit_tipo").value = tipo;
+
+    document.getElementById("modalEditar").style.display = "block";
+}
+
+function cerrarModal(){
+    document.getElementById("modalEditar").style.display = "none";
 }
 </script>
 </head>
 <body>
 
 <div class="top-bar">
-
     <div class="menu-left">
         <a href="/estadisticas">
             <button class="menu-btn">📊 Estadísticas</button>
         </a>
     </div>
-
     <div>
         <a href="/logout">
             <button class="logout-btn">Cerrar sesión</button>
         </a>
     </div>
-
 </div>
 
 <h2>💰 Sistema de Préstamos Camilo Marrugo 💵</h2>
-
-
-
-
 
 <div class="card">
 <h3>Registrar Préstamo</h3>
@@ -156,8 +162,8 @@ function calcularPreview(){
 <input name="objeto" placeholder="Objeto en garantía" required>
 
 <select name="tipo_prestamo" required>
-    <option value="fijo">Préstamo con plazo</option>
-    <option value="indefinido">Préstamo indefinido</option>
+<option value="fijo">Préstamo con plazo</option>
+<option value="indefinido">Préstamo indefinido</option>
 </select>
 
 <input name="plazo_dias" type="number" placeholder="Plazo en días (si es fijo)">
@@ -232,11 +238,8 @@ function calcularPreview(){
 {% if p.pagado == 0 %}
 
 {% if p.tipo_prestamo == "indefinido" %}
-<br>
 <a href="/mes_pagado/{{p.id}}">
-<button style="background:green;margin-top:5px;">
-Mes Pagado
-</button>
+<button style="background:green;margin-top:5px;">Mes Pagado</button>
 </a>
 {% endif %}
 
@@ -245,22 +248,12 @@ Mes Pagado
 <button type="submit">Abonar</button>
 </form>
 
-<br>
-
 <a href="/pagar/{{p.id}}">
 <button>Pagar Total</button>
 </a>
 
-
-{% endif %}
-
-<br>
-<br>
-
-{% if p.pagado == 0 %}
-<br>
-
-<button type="button" onclick="abrirModal(
+<button type="button"
+onclick="abrirModal(
 '{{p.id}}',
 '{{p.nombre}}',
 '{{p.cedula}}',
@@ -272,81 +265,42 @@ Mes Pagado
 '{{p.medio}}',
 '{{p.objeto}}',
 '{{p.tipo_prestamo}}'
-)" style="background:#2563eb;margin-top:5px;">
+)"
+style="background:#2563eb;margin-top:5px;">
 Editar
 </button>
 
+{% endif %}
 
 <a href="/eliminar/{{p.id}}">
 <button style="background:red;margin-top:5px;">Eliminar</button>
 </a>
 
 </td>
-
 </tr>
 {% endfor %}
-
 </table>
 </div>
 
-<!-- MODAL EDITAR -->
+<!-- MODAL -->
 <div id="modalEditar" style="display:none; position:fixed; top:5%; left:50%; transform:translateX(-50%); background:white; padding:20px; border-radius:12px; width:90%; max-width:500px; box-shadow:0 0 15px rgba(0,0,0,0.3); z-index:1000;">
 
 <h3>Editar Préstamo</h3>
 
 <form method="POST" id="formEditar">
-
 <input name="nombre" id="edit_nombre" required>
 <input name="cedula" id="edit_cedula" required>
 <input name="celular" id="edit_celular" required>
-
 <input name="monto" id="edit_monto" type="number" required>
 <input name="interes" id="edit_interes" type="number" required>
-
 <input name="fecha_prestamo" id="edit_fecha_prestamo" type="date" required>
 <input name="fecha_pago" id="edit_fecha_pago" type="date" required>
-
 <input name="medio" id="edit_medio" required>
 <input name="objeto" id="edit_objeto" required>
 
 <select name="tipo_prestamo" id="edit_tipo">
-    <option value="fijo">Préstamo con plazo</option>
-    <option value="indefinido">Préstamo indefinido</option>
-</select>
-
-<input name="plazo_dias" id="edit_plazo" type="number">
-
-<br><br>
-
-<button type="submit" style="background:#2563eb;">Guardar Cambios</button>
-<button type="button" onclick="cerrarModal()" style="background:#444;margin-top:5px;">Cancelar</button>
-
-</form>
-</div>
-
-<!-- MODAL EDITAR -->
-<div id="modalEditar" style="display:none; position:fixed; top:5%; left:50%; transform:translateX(-50%); background:white; padding:20px; border-radius:12px; width:90%; max-width:500px; box-shadow:0 0 15px rgba(0,0,0,0.3); z-index:1000;">
-
-<h3>Editar Préstamo</h3>
-
-<form method="POST" id="formEditar">
-
-<input name="nombre" id="edit_nombre" required>
-<input name="cedula" id="edit_cedula" required>
-<input name="celular" id="edit_celular" required>
-
-<input name="monto" id="edit_monto" type="number" required>
-<input name="interes" id="edit_interes" type="number" required>
-
-<input name="fecha_prestamo" id="edit_fecha_prestamo" type="date" required>
-<input name="fecha_pago" id="edit_fecha_pago" type="date" required>
-
-<input name="medio" id="edit_medio" required>
-<input name="objeto" id="edit_objeto" required>
-
-<select name="tipo_prestamo" id="edit_tipo">
-    <option value="fijo">Préstamo con plazo</option>
-    <option value="indefinido">Préstamo indefinido</option>
+<option value="fijo">Préstamo con plazo</option>
+<option value="indefinido">Préstamo indefinido</option>
 </select>
 
 <input name="plazo_dias" id="edit_plazo" type="number">
