@@ -236,13 +236,13 @@ onkeyup="actualizarFechaPago()">
 <td>{{p.cedula}}</td>
 <td>{{p.celular}}</td>
 <td>{{p.tipo_prestamo}}</td>
-<td>${{p.monto}}</td>
+<td>${{p.monto | cop}}</td>
 <td>{{p.interes}}%</td>
 <td>{{p.medio}}</td>
 <td>{{p.objeto}}</td>
 <td>{{p.fecha_prestamo}}</td>
 <td>{{p.fecha_pago}}</td>
-<td>${{p.mora}}</td>
+<td>${{p.mora | cop}}</td>
 <td>{{p.dias}}</td>
 
 <td>
