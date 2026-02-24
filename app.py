@@ -238,48 +238,7 @@ def estadisticas():
         ganancia_real=round(ganancia_real,2),
         ganancia_proyectada=round(ganancia_proyectada,2)
     )
-#------------------------
-#EXPORTAR TODA LA BASE DE DATOS A EXCEL
-#------------------------
-@app.route('/exportar_base_completa')
-def exportar_base_completa():
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
 
-        # Obtener todas las tablas públicas
-        cursor.execute("""
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema='public'
-        """)
-        tablas = cursor.fetchall()
-
-        output = io.BytesIO()
-
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            for tabla in tablas:
-                nombre_tabla = tabla[0]
-
-                df = pd.read_sql_query(
-                    f"SELECT * FROM {nombre_tabla}",
-                    conn
-                )
-
-                df.to_excel(writer, sheet_name=nombre_tabla[:31], index=False)
-
-        conn.close()
-        output.seek(0)
-
-        return send_file(
-            output,
-            as_attachment=True,
-            download_name="base_datos_completa.xlsx",
-            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-    except Exception as e:
-        return str(e), 500
 # =========================
 # CALCULAR MORA
 # =========================
